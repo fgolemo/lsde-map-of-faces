@@ -131,6 +131,11 @@
       <artifactId>commons-compress</artifactId>
       <version>1.5</version>
     </dependency>
+    <!--dependency>
+	  <groupId>org.openimaj.tools</groupId>
+	  <artifactId>HadoopGlobalFeaturesTool</artifactId>
+	  <version>${openimaj.version}</version>
+    </dependency-->
   </dependencies>
   <repositories>
     <repository>
