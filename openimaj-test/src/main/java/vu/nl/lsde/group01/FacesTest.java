@@ -1,15 +1,30 @@
 package vu.nl.lsde.group01;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorInputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
@@ -34,20 +49,12 @@ import org.openimaj.image.processing.face.detection.HaarCascadeDetector;
 import org.openimaj.image.processing.face.detection.HaarCascadeDetector.BuiltInCascade;
 import org.openimaj.io.IOUtils;
 
-/**
- * Hadoop version of the LocalFeaturesTool. Capable of extracting features from
- * images in sequencefiles.
- * 
- * @author Jonathon Hare (jsh2@ecs.soton.ac.uk)
- * @author Sina Samangooei (ss@ecs.soton.ac.uk)
- */
 public class FacesTest extends Configured implements Tool {
-    private static final String ARGS_KEY = "facestest.args";
     private static Logger logger = Logger.getLogger(FacesTest.class);
     
 
     @Option(name = "-input", aliases="-i", required=true, usage="Set the input path(s) or uri(s)")
-    protected static List<String> input;
+    protected static Collection<String> input;
     
     @Option(name = "-output", aliases="-o", required=true, usage="Set the output location")
     protected static String output;
@@ -77,23 +84,78 @@ public class FacesTest extends Configured implements Tool {
 
         @Override
         protected void map(Text key, BytesWritable value, Mapper<Text, BytesWritable, Text, BytesWritable>.Context context) throws InterruptedException {
+            BufferedInputStream bis = null;
+            
+            bis = new BufferedInputStream(new ByteArrayInputStream(value.getBytes()));
+            
+            CompressorInputStream input = null;
             try {
-                MBFImage img = ImageUtilities.readMBF(new ByteArrayInputStream(value.getBytes()));
-                FaceDetectorFeatures mode = FaceDetectorFeatures.BLOBS;
-                BuiltInCascade cascade = BuiltInCascade.frontalface_default;
+                input = new CompressorStreamFactory().createCompressorInputStream(bis);
+            } catch (CompressorException e2) {
+                // TODO Auto-generated catch block
+                e2.printStackTrace();
+            }
+            BufferedReader br2 = new BufferedReader(new InputStreamReader(input));
 
-                HaarCascadeDetector fd = cascade.load();
-                FeatureVector fv = mode.getFeatureVector(fd.detectFaces(Transforms.calculateIntensityNTSC(img)), img);
+            boolean end = false;
+            InputStream in = null;
+            String line = null;
+            String[] columns = null;
+            ArrayList<String> errors = new ArrayList<String>();
+            int i = 0;
+            while(!end){
+                try {
+                    line = br2.readLine();
+                } catch (IOException e1) {
+                    // TODO Auto-generated catch block
+                    e1.printStackTrace();
+                }
+                columns = line.split("\t");
+                
+                //get url
+                String url = columns[14];
+                
+                //if video or not geotagged
+                if(!columns[22].equals("0") || columns[10].isEmpty()){
+                    continue;
+                }
+                
+                URL link = null;
+                try {
+                    link = new URL(url);
+                } catch (MalformedURLException e1) {
+                    errors.add("Image at URL: "+url+" not found.");
+                    continue;
+                } 
+                try {
+                    in = new BufferedInputStream(link.openStream());
+                } catch (IOException e1) {
+                    errors.add("Could not load Image at URL: "+url+".");
+                    continue;
+                }
 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                if (FacesTest.binary)
-                    IOUtils.writeBinary(baos, fv);
-                else
-                    IOUtils.writeASCII(baos, fv);
+                try {
+                    MBFImage img = ImageUtilities.readMBF(in);
+                    FaceDetectorFeatures mode = FaceDetectorFeatures.BLOBS;
+                    BuiltInCascade cascade = BuiltInCascade.frontalface_default;
 
-                context.write(key, new BytesWritable(baos.toByteArray()));
-            } catch (Exception e) {
-                logger.warn("Problem processing image " + key + " (" + e + ")");
+                    HaarCascadeDetector fd = cascade.load();
+                    FeatureVector fv = mode.getFeatureVector(fd.detectFaces(Transforms.calculateIntensityNTSC(img)), img);
+
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    if (FacesTest.binary)
+                        IOUtils.writeBinary(baos, fv);
+                    else
+                        IOUtils.writeASCII(baos, fv);
+
+                    context.write(key, new BytesWritable(baos.toByteArray()));
+                    in.close();
+                } catch (Exception e) {
+                    continue;
+                }
+                
+                i++;
+                if(i>1000) end = true;
             } 
         }
     }
@@ -128,7 +190,6 @@ public class FacesTest extends Configured implements Tool {
         Job job = TextBytesJobUtil.createJob(allPaths, new Path(output), metadata, this.getConf());
         job.setJarByClass(this.getClass());
         job.setMapperClass(FacesMapper.class);
-        job.getConfiguration().setStrings(ARGS_KEY, args);
         job.setReducerClass(FacesReducer.class);
         job.setNumReduceTasks(1);
 
