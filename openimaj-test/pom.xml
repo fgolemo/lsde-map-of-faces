@@ -131,6 +131,11 @@
       <artifactId>commons-compress</artifactId>
       <version>1.5</version>
     </dependency>
+    <dependency>
+        <groupId>commons-collections</groupId>
+        <artifactId>commons-collections</artifactId>
+        <version>3.2.1</version>
+    </dependency>
     <!--dependency>
 	  <groupId>org.openimaj.tools</groupId>
 	  <artifactId>HadoopGlobalFeaturesTool</artifactId>
@@ -145,6 +150,10 @@
     <repository>
       <id>openimaj-snapshots</id>
       <url>http://snapshots.openimaj.org/</url>
+    </repository>
+    <repository>
+        <id>maven-central</id>
+        <url>http://repo.maven.apache.org/maven2</url>
     </repository>
   </repositories>
   <build>
