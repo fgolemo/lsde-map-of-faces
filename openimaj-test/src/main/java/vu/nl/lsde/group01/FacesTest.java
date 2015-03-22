@@ -8,10 +8,15 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
@@ -20,9 +25,11 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
+import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.MBFImage;
 import org.openimaj.image.colour.Transforms;
@@ -30,6 +37,7 @@ import org.openimaj.image.processing.face.detection.DetectedFace;
 import org.openimaj.image.processing.face.detection.FaceDetectorFeatures;
 import org.openimaj.image.processing.face.detection.HaarCascadeDetector;
 import org.openimaj.image.processing.face.detection.HaarCascadeDetector.BuiltInCascade;
+import org.openimaj.image.processing.resize.ResizeProcessor;
 
 public class FacesTest extends Configured implements Tool {
     private static Logger logger = Logger.getLogger(FacesTest.class);
@@ -47,15 +55,28 @@ public class FacesTest extends Configured implements Tool {
         }
     }
     
-    static class FacesMapper extends Mapper<Object, Text, DoubleWritable, BytesWritable> {
-        public FacesMapper() {}
-
-        @Override
-        protected void setup(Mapper<Object, Text, DoubleWritable, BytesWritable>.Context context) {
+    static class FacesMapper extends Mapper<Object, Text, ArrayWritable, BytesWritable> {
+    	protected HaarCascadeDetector fd = null;
+    	protected SortedMap<String, ResizeProcessor> resizers = null;
+    	protected static Float[] RESIZE_LEVEL = new Float[]{50f,100f};
+    	
+        public FacesMapper() {
+        	BuiltInCascade cascade = BuiltInCascade.frontalface_alt_tree;
+            fd = cascade.load();
+            fd.setScale(1.2f);
+            
+            resizers = new TreeMap<String, ResizeProcessor>();
+            for(Float size : RESIZE_LEVEL){
+            	resizers.put(size.toString(), new ResizeProcessor(size, size));
+            }
         }
 
         @Override
-        protected void map(Object key, Text value, Mapper<Object, Text, DoubleWritable, BytesWritable>.Context context) throws InterruptedException {
+        protected void setup(Mapper<Object, Text, ArrayWritable, BytesWritable>.Context context) {
+        }
+
+        @Override
+        protected void map(Object key, Text value, Mapper<Object, Text, ArrayWritable, BytesWritable>.Context context) throws InterruptedException {
             InputStream in = null;
             String line = value.toString();
             String[] columns = null;
@@ -63,14 +84,13 @@ public class FacesTest extends Configured implements Tool {
             
             columns = line.split("\t");
             
-            //get url
-            String url = columns[14];
-            
             //if video or not geotagged
             if(!columns[22].equals("0") || columns[10].isEmpty()){
                 return;
             }
             
+            //get url
+            String url = columns[14];
             URL link = null;
             try {
                 link = new URL(url);
@@ -87,60 +107,51 @@ public class FacesTest extends Configured implements Tool {
 
             try {
                 MBFImage img = ImageUtilities.readMBF(in);
-                FaceDetectorFeatures mode = FaceDetectorFeatures.BLOBS;
-                BuiltInCascade cascade = BuiltInCascade.frontalface_default;
-
-                HaarCascadeDetector fd = cascade.load();
                 List<DetectedFace> faces = fd.detectFaces(Transforms.calculateIntensity(img));
                 
-                if (faces.isEmpty()){
-                	return;
-                }
+                for(DetectedFace face : faces){
+                    System.out.println("Face detected");
+
+                	MBFImage faceImage = img.extractROI(face.getBounds());
+                    String lon = columns[10].trim();
+                    String lat = columns[11].trim();
+                	for(String size : resizers.keySet()){
+                		MBFImage faceImageResized = faceImage.process(resizers.get(size));
+                		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        ImageUtilities.write(faceImageResized, "jpg", baos);
+                        
+                        //uncomment to get image in Base64 encoding
+                        //context.write(new ArrayWritable(new String[]{lon,lat,size}), new BytesWritable(Base64.encodeBase64(baos.toByteArray())));                	
+                        context.write(new ArrayWritable(new String[]{lon,lat,size}), new BytesWritable(baos.toByteArray()));                	
+                	}
                 	
-                MBFImage faceImage = img.extractROI(faces.get(0).getBounds());
-                System.out.println("Face detected");
-                //FeatureVector fv = mode.getFeatureVector(fd.detectFaces(Transforms.calculateIntensityNTSC(img)), img);
-
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                
-                Double lon = Double.parseDouble(columns[10].trim());
-                byte[] lonBytes = new byte[8];
-                ByteBuffer.wrap(lonBytes).putDouble(lon);
-                baos.write(lonBytes);
-                
-                Double lat = Double.parseDouble(columns[11].trim());
-                byte[] latBytes = new byte[8];
-                ByteBuffer.wrap(latBytes).putDouble(lat);
-                baos.write(latBytes);
-                
-                ImageUtilities.write(faceImage,"jpg",baos);
-
-                context.write(new DoubleWritable(lon), new BytesWritable(baos.toByteArray()));
+                }
                 in.close();
-                
             } catch (Exception e) {
             	return;
             }
 
         }
+
     }
     
-    static class FacesReducer extends Reducer<Double, BytesWritable, Text, BytesWritable> {
+    
+    /*static class FacesReducer extends Reducer<StringWritable, BytesWritable, Text, BytesWritable> {
         public FacesReducer() {}
 
         @Override
-        protected void setup(Reducer<Double, BytesWritable, Text, BytesWritable>.Context context) {
+        protected void setup(Reducer<StringWritable, BytesWritable, Text, BytesWritable>.Context context) {
         }
         
         @Override
-        protected void reduce(Double key, Iterable<BytesWritable> values, Context context) 
+        protected void reduce(StringWritable key, Iterable<BytesWritable> values, Context context) 
                 throws IOException, InterruptedException {
             for(BytesWritable value: values) {
                 context.write(new Text(key.toString()), (BytesWritable) value);
             }
         }
        
-    }
+    }*/
 
     @Override
     public int run(String[] args) throws Exception {
@@ -149,8 +160,8 @@ public class FacesTest extends Configured implements Tool {
         Job job = Job.getInstance(getConf(), "world map of faces");
         job.setJarByClass(this.getClass());
         job.setMapperClass(FacesMapper.class);
-        job.setReducerClass(FacesReducer.class);
-        job.setNumReduceTasks(1);
+        job.setOutputFormatClass(SequenceFileOutputFormat.class);
+        job.setNumReduceTasks(0);
 
         FileInputFormat.addInputPath(job, new Path(input));
         FileOutputFormat.setOutputPath(job, new Path(output));
