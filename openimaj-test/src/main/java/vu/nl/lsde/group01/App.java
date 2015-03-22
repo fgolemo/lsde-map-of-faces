@@ -31,11 +31,14 @@ import org.openimaj.image.colour.Transforms;
 import org.openimaj.image.processing.face.detection.CCDetectedFace;
 import org.openimaj.image.processing.face.detection.DetectedFace;
 import org.openimaj.image.processing.face.detection.FaceDetector;
+import org.openimaj.image.processing.face.detection.FaceDetectorFeatures;
 import org.openimaj.image.processing.face.detection.HaarCascadeDetector;
+import org.openimaj.image.processing.face.detection.HaarCascadeDetector.BuiltInCascade;
 import org.openimaj.image.processing.face.detection.IdentityFaceDetector;
 import org.openimaj.image.processing.face.detection.SandeepFaceDetector;
 import org.openimaj.image.processing.face.detection.keypoints.FKEFaceDetector;
 import org.openimaj.image.processing.face.detection.keypoints.KEDetectedFace;
+import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.xml.sax.SAXException;
 
 import cern.colt.Arrays;
@@ -52,28 +55,35 @@ public class App {
     public static void main( String[] args ) throws CompressorException, FileNotFoundException {
         readImages();
         
-        FaceDetector<DetectedFace,FImage> fd = new HaarCascadeDetector(80);
+        //FaceDetector<DetectedFace,FImage> fd = new HaarCascadeDetector(80);
         //FaceDetector<KEDetectedFace, FImage> fdSandeep = new FKEFaceDetector();
-
+        ResizeProcessor resize = new ResizeProcessor(100, 100);
+        BuiltInCascade cascade = BuiltInCascade.frontalface_alt_tree;
+        HaarCascadeDetector fd = cascade.load();
+        fd.setScale(1.15f);
+        
         int faceCounter = 0;
         MBFImage image = null;
         
         for(int i = 0; i< 1000; i++){
             try{
-                image = ImageUtilities.readMBF(new File("resources/"+i+"_b.jpg"));
+                image = ImageUtilities.readMBF(new File("resources/"+i+".jpg"));
             }catch(IOException e){
                 continue;
             }
-            List<DetectedFace> faces = fd.detectFaces(Transforms.calculateIntensity(image));
             
+            
+            List<DetectedFace> faces = fd.detectFaces(Transforms.calculateIntensity(image));
+            //FaceDetector<KEDetectedFace, FImage> fdSandeep = new FKEFaceDetector();
+
             int j = 0;
             for( DetectedFace face : faces ) {
                 //image.drawShape(face.getBounds(), RGBColour.RED);
                 //faceCounter++;
                 MBFImage faceImage = image.extractROI(face.getBounds());
-                
+                faceImage = faceImage.process(resize);
                 try {
-                    ImageUtilities.write(faceImage, new File("resources/face"+i+"_"+j+"_b.jpg"));
+                    ImageUtilities.write(faceImage, new File("resources/new_run/face"+i+"_"+j+".jpg"));
                 } catch (IOException e) {
                     continue;
                 }
@@ -106,9 +116,9 @@ public class App {
                 // TODO Auto-generated catch block
                 e1.printStackTrace();
             }
+            
             columns = line.split("\t");
-            String url = "https://farm"+columns[18]+".staticflickr.com/"+columns[17]+"/"+columns[0]+"_"+columns[19]+"_b."+columns[21];//columns[14];
-            //System.out.println(Arrays.toString(url));
+            String url = columns[14];
 
             if(!columns[22].equals("0")){
                 continue;
