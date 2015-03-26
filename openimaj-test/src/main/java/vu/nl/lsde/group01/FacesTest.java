@@ -157,7 +157,7 @@ public class FacesTest{
     public static void main(String[] args) throws Exception {
     	prepare(args);
     	Configuration conf = new Configuration();
-        conf.setLong("mapred.max.split.size", 10000);
+        conf.setLong("mapred.max.split.size", 700000);
 
         Job job = new Job(conf, "world map of faces test");
         job.setJarByClass(FacesTest.class);
