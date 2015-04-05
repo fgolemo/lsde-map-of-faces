@@ -10,7 +10,7 @@ class MRWordFrequencyCount(MRJob):
 
     def reducer(self, key, values):
         a = sum(values)
-        yield key, agit add 
+        yield key, a
 
 
 if __name__ == '__main__':
