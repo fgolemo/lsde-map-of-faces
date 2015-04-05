@@ -1,11 +1,10 @@
 import sys
 
-filePath = "/media/florian/Data/lsde-data/binning-output/output-z"
-zoom = str(20)
+filePath = "/media/florian/Data/lsde-data/binning-output/output-z0-3"
 
 out = {}
 
-with open(filePath + zoom) as f:
+with open(filePath) as f:
     for line in f:
         lineSplit = line.split("\t")
 
@@ -20,12 +19,13 @@ with open(filePath + zoom) as f:
 
 sorted(out, key=out.get)
 
+
 def asint(s):
     try:
         return int(s), ''
     except ValueError:
         return sys.maxint, s
 
-for key, val in [(k, out[k]) for k in sorted(out, key=asint)]:
+for key, val in [(k, out[k]) for k in sorted(out, key=asint, reverse=True)]:
     # print key, val
     print "".join(val)
