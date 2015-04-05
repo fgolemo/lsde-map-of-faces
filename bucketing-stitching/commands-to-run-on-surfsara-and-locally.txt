@@ -1,0 +1,12 @@
+
+# local test
+python 1b-binning.py mapperJobs-z0.txt -r local --output-dir=/media/florian/Data/lsde-data/binning-output --no-output --picfile=/media/florian/Data/lsde-data/redFileSplit2-test
+
+# hadoop test run
+python 1b-binning.py mapperJobs-z0.txt -r hadoop --output-dir=hdfs:///user/lsde01/binning-output-z0 --no-output --picfile=hdfs:///user/lsde01/redFileSplit2-test
+
+# first full run on hadoop, zoom level 0
+python 1b-binning.py mapperJobs-z0.txt -r hadoop --output-dir=hdfs:///user/lsde01/binning-output-z0 --no-output --picfile=hdfs:///user/lsde01/redFileSplit2-combined-base64-50px
+
+# second attempt (run on the login node)
+python 1b-binning.py mapperJobs-z0.txt -r hadoop --output-dir=hdfs:///user/lsde01/binning-output-z0 --no-output --picfile=~/output/redFileSplit2-combined-base64-50px --hadoop-streaming-jar=/usr/hdp/2.2.0.0-2041/hadoop-mapreduce/hadoop-streaming.jar
