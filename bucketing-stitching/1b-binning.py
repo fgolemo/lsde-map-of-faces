@@ -1,18 +1,19 @@
 from mrjob.job import MRJob
 from bisect import bisect_left
+import sys
+
 
 class LSDEbinning(MRJob):
-
     filePath = "/media/florian/Data/lsde-data/redFileSplit2-test"
     outPath = "/media/florian/Data/lsde-data/binning-output/"
 
-    picsPerZoomLevel = { # only y axis, i.e. full image for zoom level 0 is 50x100, 4 is 100x200
-        0: 50,
-        4: 100,
-        8: 200,
-        12: 500,
-        16: 1000
-    }
+    picsPerZoomLevel = {  # only y axis, i.e. full image for zoom level 0 is 50x100, 4 is 100x200
+                          0: 50,
+                          4: 100,
+                          8: 200,
+                          12: 500,
+                          16: 1000
+                          }
     coordsX = []
     row = 0
     yTop = 90
@@ -47,7 +48,7 @@ class LSDEbinning(MRJob):
         x = bisect_left(self.coordsX, coordX, lo, hi) - 1
         return x
 
-    def isCorrectRow(self, long):
+    def isCorrectRow(self, long):  # I double-check this. this works
         if self.yBottom <= long < self.yTop:
             return True
         return False
@@ -60,29 +61,34 @@ class LSDEbinning(MRJob):
 
         cols = len(self.coordsX) + 1
 
-        done = [0] * cols
-        out = [0] * cols
+        out = dict(zip(range(cols), [0] * cols))
 
         with open(self.filePath) as f:
             for fileLine in f:
                 split1 = fileLine.find(" ")
                 split2 = fileLine.find(" ", split1 + 1)
-                lat = float(fileLine[:split1])
-                long = float(fileLine[split1 + 1:split2])
+                long = float(fileLine[:split1])
+                lat = float(fileLine[split1 + 1:split2])
 
                 if not self.isCorrectRow(long):
                     continue
                 col = self.whichCell(lat)
-                if done[col] == 0:
-                    done[col] = 1
+                if out[col] == 0:
                     out[col] = fileLine[split2 + 1:-1]
             yield self.row, out
 
+    def asint(self, s):
+        try:
+            return int(s), ''
+        except ValueError:
+            return sys.maxint, s
+
+
     def reducer(self, key, values):
-        tmpVals = []
-        for tmpVal in values: # in case there is more than one set of values, concat them
-            tmpVals += tmpVal
-        out = ",".join(str(v) for v in tmpVals)
+        tmpVals = values.next()
+        tmpVals = [str(tmpVals[k]) for k in sorted(tmpVals, key=self.asint)]
+
+        out = ','.join(tmpVals)
         yield key, out
 
 

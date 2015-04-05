@@ -1,6 +1,7 @@
+import sys
 
 filePath = "/media/florian/Data/lsde-data/binning-output/output-z"
-zoom = str(4)
+zoom = str(20)
 
 out = {}
 
@@ -19,5 +20,12 @@ with open(filePath + zoom) as f:
 
 sorted(out, key=out.get)
 
-for key, val in out.iteritems():
+def asint(s):
+    try:
+        return int(s), ''
+    except ValueError:
+        return sys.maxint, s
+
+for key, val in [(k, out[k]) for k in sorted(out, key=asint)]:
+    # print key, val
     print "".join(val)
