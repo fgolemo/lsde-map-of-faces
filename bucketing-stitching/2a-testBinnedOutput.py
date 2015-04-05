@@ -1,6 +1,6 @@
 import sys
 
-filePath = "/media/florian/Data/lsde-data/binning-output/output-z0-3"
+filePath = "/media/florian/Data/lsde-data/binning-output/output-z0-4"
 
 out = {}
 
