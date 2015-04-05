@@ -67,8 +67,8 @@ class LSDEbinning(MRJob):
             for fileLine in f:
                 split1 = fileLine.find(" ")
                 split2 = fileLine.find(" ", split1 + 1)
-                long = float(fileLine[:split1])
-                lat = float(fileLine[split1 + 1:split2])
+                lat = float(fileLine[:split1])
+                long = float(fileLine[split1 + 1:split2])
 
                 if not self.isCorrectRow(long):
                     continue
@@ -79,7 +79,10 @@ class LSDEbinning(MRJob):
             yield self.row, out
 
     def reducer(self, key, values):
-        out = ",".join(str(v) for v in values.next())
+        tmpVals = []
+        for tmpVal in values: # in case there is more than one set of values, concat them
+            tmpVals += tmpVal
+        out = ",".join(str(v) for v in tmpVals)
         yield key, out
 
 
