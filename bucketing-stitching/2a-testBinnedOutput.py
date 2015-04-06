@@ -1,6 +1,6 @@
 import sys
 
-filePath = "/media/florian/Data/lsde-data/binning-output/output-z0-4"
+filePath = "/media/florian/Data/lsde-data/binning-output/output-z8"
 
 out = {}
 
@@ -11,9 +11,9 @@ with open(filePath) as f:
         imgData = lineSplit[1][1:-2].split(",")
         lineBuf = []
         for img in imgData:
-            if img == "0":
+            if img == "0":  # we don't have an img
                 lineBuf.append(".")
-            else:
+            else:  # we DO have an img
                 lineBuf.append("0")
         out[lineSplit[0]] = lineBuf
 
@@ -25,6 +25,7 @@ def asint(s):
         return int(s), ''
     except ValueError:
         return sys.maxint, s
+
 
 for key, val in [(k, out[k]) for k in sorted(out, key=asint, reverse=True)]:
     # print key, val

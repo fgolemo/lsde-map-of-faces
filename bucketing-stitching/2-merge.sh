@@ -1,7 +1,12 @@
+#!/usr/bin/env bash
 
-a=`ls -mv $1/*.jpg | tr "," " " | tr "\n" " " | tr -s " "`
+cd $1
+
+a=`ls -mv $2/*.jpg | tr "," " " | tr "\n" " " | tr -s " "`
 # echo $a
-tilesY=$(echo '2^'$1 | bc)
-tilesX=$(echo '2*2^'$1 | bc)
-echo  $tilesX $tilesY 
-montage $a -tile ${tilesX}x${tilesY} -geometry 100x100 out$1.jpg
+#tilesY=$(echo '2^'$2 | bc)
+#tilesX=$(echo '2*2^'$2 | bc)
+tilesY=500
+tilesX=1002
+echo  $tilesX $tilesY
+montage $a -tile ${tilesX}x${tilesY} -geometry 50x50 out$2.jpg
